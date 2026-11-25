@@ -31,8 +31,17 @@ jobs:
       - name: Extract project
         run: |
           unzip -q HyperCatAI-MobileBuild.zip -d extracted
-          rm -rf extracted/HyperCatAI/.github
           cp -a extracted/HyperCatAI/. .
+
+      - name: Fix Compose import
+        run: |
+          sed -i '/import androidx.compose.ui.platform.setContent/d' app/src/main/java/com/hypercat/ai/MainActivity.kt
+
+      - name: Verify project
+        run: |
+          test -f settings.gradle.kts
+          test -f app/build.gradle.kts
+          test -f app/src/main/java/com/hypercat/ai/MainActivity.kt
 
       - name: Build APK
         run: gradle --no-daemon :app:assembleDebug
