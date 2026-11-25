@@ -37,9 +37,15 @@ jobs:
           unzip -q HyperCatAI-MobileBuild.zip -d extracted
           cp -a extracted/HyperCatAI/. .
 
-      - name: Fix Compose import
+      
+      - name: Inspect source for repair
         run: |
-          sed -i '/import androidx.compose.ui.platform.setContent/d' app/src/main/java/com/hypercat/ai/MainActivity.kt
+          echo "===== MAIN ACTIVITY ====="
+          sed -n '1,320p' app/src/main/java/com/hypercat/ai/MainActivity.kt
+          echo "===== ANDROID MANIFEST ====="
+          find app/src/main -name AndroidManifest.xml -exec sh -c 'echo "===== $1 ====="; cat "$1"' _ {} \;
+          echo "===== KOTLIN FILE LIST ====="
+          find app/src/main/java -type f -name '*.kt' -print
 
       - name: Verify project
         run: |
