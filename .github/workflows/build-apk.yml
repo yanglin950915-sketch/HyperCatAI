@@ -37,20 +37,35 @@ jobs:
           unzip -q HyperCatAI-MobileBuild.zip -d extracted
           cp -a extracted/HyperCatAI/. .
 
-      - name: Inspect source for repair
+      - name: Restore Compose import
         run: |
-          echo "===== MAIN ACTIVITY ====="
-          sed -n '1,320p' app/src/main/java/com/hypercat/ai/MainActivity.kt
-          echo "===== ANDROID MANIFEST ====="
-          find app/src/main -name AndroidManifest.xml -exec sh -c 'echo "===== $1 ====="; cat "$1"' _ {} \;
-          echo "===== KOTLIN FILE LIST ====="
-          find app/src/main/java -type f -name '*.kt' -print
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("app/src/main/java/com/hypercat/ai/MainActivity.kt")
+          s = p.read_text()
+          imp = "import androidx.compose.ui.platform.setContent"
+
+          if imp not in s:
+              lines = s.splitlines()
+              for i, line in enumerate(lines):
+                  if line.startswith("package "):
+                      lines.insert(i + 1, "")
+                      lines.insert(i + 2, imp)
+                      break
+              else:
+                  raise SystemExit("Cannot find Kotlin package declaration")
+              p.write_text("\n".join(lines) + "\n")
+
+          print("Compose import checked/restored")
+          PY
 
       - name: Verify project
         run: |
           test -f settings.gradle.kts
           test -f app/build.gradle.kts
           test -f app/src/main/java/com/hypercat/ai/MainActivity.kt
+          grep -n "compose.ui.platform.setContent" app/src/main/java/com/hypercat/ai/MainActivity.kt
 
       - name: Build APK
         run: |
@@ -64,6 +79,7 @@ jobs:
           exit $RESULT
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: HyperCatAI-debug-apk
