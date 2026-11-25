@@ -37,53 +37,37 @@ jobs:
           unzip -q HyperCatAI-MobileBuild.zip -d extracted
           cp -a extracted/HyperCatAI/. .
 
+      - name: Inspect source for repair
+        run: |
+          echo "===== MAIN ACTIVITY ====="
+          sed -n '1,320p' app/src/main/java/com/hypercat/ai/MainActivity.kt
+          echo "===== ANDROID MANIFEST ====="
+          find app/src/main -name AndroidManifest.xml -exec sh -c 'echo "===== $1 ====="; cat "$1"' _ {} \;
+          echo "===== KOTLIN FILE LIST ====="
+          find app/src/main/java -type f -name '*.kt' -print
+
       - name: Fix Activity Compose import
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          p = Path("app/src/main/java/com/hypercat/ai/MainActivity.kt")
-          s = p.read_text()
-
-          wrong = "import androidx.compose.ui.platform.setContent"
-          correct = "import androidx.activity.compose.setContent"
-
-          s = s.replace(wrong, "")
-          if correct not in s:
-              lines = s.splitlines()
-              for i, line in enumerate(lines):
-                  if line.startswith("package "):
-                      lines.insert(i + 1, "")
-                      lines.insert(i + 2, correct)
-                      break
-              else:
-                  raise SystemExit("Cannot find package declaration")
-              s = "\n".join(lines) + "\n"
-
-          p.write_text(s)
-          print("Correct Activity Compose import installed")
-          PY
+          FILE="app/src/main/java/com/hypercat/ai/MainActivity.kt"
+          if grep -q 'import androidx.compose.ui.platform.setContent' "$FILE"; then
+            sed -i '/import androidx.compose.ui.platform.setContent/d' "$FILE"
+          fi
+          if ! grep -q 'import androidx.activity.compose.setContent' "$FILE"; then
+            sed -i '/^package /a import androidx.activity.compose.setContent' "$FILE"
+          fi
+          echo "===== CURRENT IMPORTS ====="
+          grep '^import ' "$FILE"
 
       - name: Verify project
         run: |
           test -f settings.gradle.kts
           test -f app/build.gradle.kts
           test -f app/src/main/java/com/hypercat/ai/MainActivity.kt
-          grep -n "androidx.activity.compose.setContent" app/src/main/java/com/hypercat/ai/MainActivity.kt
 
       - name: Build APK
-        run: |
-          set +e
-          gradle --no-daemon :app:assembleDebug --console=plain > build.log 2>&1
-          RESULT=$?
-          echo "===== KOTLIN ERRORS ====="
-          grep -n -A 5 -B 3 -E '(^e: | error:|What went wrong)' build.log || true
-          echo "===== LAST 100 LINES ====="
-          tail -n 100 build.log
-          exit $RESULT
+        run: gradle --no-daemon :app:assembleDebug
 
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: HyperCatAI-debug-apk
