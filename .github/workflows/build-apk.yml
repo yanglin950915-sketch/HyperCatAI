@@ -37,27 +37,31 @@ jobs:
           unzip -q HyperCatAI-MobileBuild.zip -d extracted
           cp -a extracted/HyperCatAI/. .
 
-      - name: Restore Compose import
+      - name: Fix Activity Compose import
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
           p = Path("app/src/main/java/com/hypercat/ai/MainActivity.kt")
           s = p.read_text()
-          imp = "import androidx.compose.ui.platform.setContent"
 
-          if imp not in s:
+          wrong = "import androidx.compose.ui.platform.setContent"
+          correct = "import androidx.activity.compose.setContent"
+
+          s = s.replace(wrong, "")
+          if correct not in s:
               lines = s.splitlines()
               for i, line in enumerate(lines):
                   if line.startswith("package "):
                       lines.insert(i + 1, "")
-                      lines.insert(i + 2, imp)
+                      lines.insert(i + 2, correct)
                       break
               else:
-                  raise SystemExit("Cannot find Kotlin package declaration")
-              p.write_text("\n".join(lines) + "\n")
+                  raise SystemExit("Cannot find package declaration")
+              s = "\n".join(lines) + "\n"
 
-          print("Compose import checked/restored")
+          p.write_text(s)
+          print("Correct Activity Compose import installed")
           PY
 
       - name: Verify project
@@ -65,7 +69,7 @@ jobs:
           test -f settings.gradle.kts
           test -f app/build.gradle.kts
           test -f app/src/main/java/com/hypercat/ai/MainActivity.kt
-          grep -n "compose.ui.platform.setContent" app/src/main/java/com/hypercat/ai/MainActivity.kt
+          grep -n "androidx.activity.compose.setContent" app/src/main/java/com/hypercat/ai/MainActivity.kt
 
       - name: Build APK
         run: |
